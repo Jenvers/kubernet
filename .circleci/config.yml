@@ -40,16 +40,6 @@ jobs:
             ssh -o StrictHostKeyChecking=no ubuntu@34.201.47.241 "kubectl delete all --all"
             ssh -o StrictHostKeyChecking=no ubuntu@34.201.47.241 "kubectl delete all --all"
             ssh -o StrictHostKeyChecking=no ubuntu@34.201.47.241 "kubectl apply -f deployment.yaml"
-      
-      - save_cache:
-          paths:
-            - node_modules
-          key: v1-dependencies-{{ checksum "package.json" }}
-
- 
-    
-
-
 workflows:
   version: 2
   normal_run:
