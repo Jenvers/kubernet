@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-map-proxy
+data:
+  nginx.conf: |-
+    user  nginx;
+    worker_processes  1;
+    error_log  /var/log/nginx/error.log warn;
+    pid        /var/run/nginx.pid;
+    events {
+        worker_connections  1024;
+    }
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+        sendfile        on;
+        keepalive_timeout  65;
+        upstream webapp {
+            server 127.0.0.1;
+        }
+        server {
+            listen 81;
+            listen [::]:81 ipv6only=on default_server;
+            location / {
+                proxy_pass         http://localhost:5000;
+            }
+            location /please {
+                proxy_pass         http://localhost:80/index.html;
+                proxy_redirect     off;
+            }
+        }
+    }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-app
+spec:
+  containers:
+    - name: svc-nginx
+      image: nginx
+      ports:
+        - containerPort: 81
+      volumeMounts:
+        - name : config-proxy
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+    - name: app1
+      image: httpd:2.4
+      volumeMounts:
+        - name: config-app1
+          mountPath: /usr/local/apache2/htdocs/
+  volumes:
+    - name: config-app1
+      hostPath:
+        path: /home/ubuntu/App1/
+    - name: config-proxy
+      configMap:
+        name: config-map-proxy   
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  ports:
+    - port: 81
+      protocol: TCP
+  selector:
+    app: pod-app
+  type: LoadBalancer
