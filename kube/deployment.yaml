@@ -1,7 +1,52 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: app-ti
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: app1
+          image: httpd:2.4
+          volumeMounts:
+          - name: index-config1
+            mountPath: /usr/local/apache2/htdocs/
+        - name: app2
+          image: httpd:2.4
+          volumeMounts:
+          - name: index-config2
+            mountPath: /usr/local/apache2/htdocs/
+        - name: nginx
+          image: nginx:alpine
+          ports:
+          - containerPort: 81
+          volumeMounts:
+          - name: nginx-proxy-config
+            mountPath: /etc/nginx/nginx.conf
+            subPath: nginx.conf
+      volumes:
+        - name: index-config1
+          hostPath:
+            path: /home/ubuntu/App1/
+        - name: nginx-proxy-config
+          configMap:
+            name: config-map
+        - name: index-config2
+          hostPath:
+            path: /home/ubuntu/App2/
+           
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: config-map-proxy
+  name: config-map
 data:
   nginx.conf: |-
     user  nginx;
@@ -25,7 +70,7 @@ data:
             location / {
                 proxy_pass         http://localhost:5000;
             }
-            location /please {
+            location /app2 {
                 proxy_pass         http://localhost:80/index.html;
                 proxy_redirect     off;
             }
@@ -33,40 +78,17 @@ data:
     }
 ---
 apiVersion: v1
-kind: Pod
-metadata:
-  name: pod-app
-spec:
-  containers:
-    - name: svc-nginx
-      image: nginx
-      ports:
-        - containerPort: 81
-      volumeMounts:
-        - name : config-proxy
-          mountPath: /etc/nginx/nginx.conf
-          subPath: nginx.conf
-    - name: app1
-      image: httpd:2.4
-      volumeMounts:
-        - name: config-app1
-          mountPath: /usr/local/apache2/htdocs/
-  volumes:
-    - name: config-app1
-      hostPath:
-        path: /home/ubuntu/App1/
-    - name: config-proxy
-      configMap:
-        name: config-map-proxy   
----
-apiVersion: v1
 kind: Service
 metadata:
-  name: nginx-service
+  name: service-proxy
+  namespace: default
 spec:
   ports:
-    - port: 81
-      protocol: TCP
+  - nodePort: 31100
+    port: 81
+    protocol: TCP
+    targetPort: 81
   selector:
-    app: pod-app
+    app: nginx
+  sessionAffinity: None
   type: LoadBalancer
